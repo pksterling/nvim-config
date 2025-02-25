@@ -8,6 +8,7 @@ vim.call('plug#begin')
   Plug('f-person/git-blame.nvim')
   Plug('kdheepak/lazygit.nvim')
     -- plenary (optional)
+  Plug('iamcco/markdown-preview.nvim', { ['do'] = 'cd app && npx --yes yarn install' })
   Plug('williamboman/mason.nvim')
     -- mason-lspconfig.nvim (optional)
     -- nvim-lspconfig (optional)
@@ -135,7 +136,7 @@ cmp.setup.cmdline(':', {
 -- Set up lspconfig.
 local capabilities = require('cmp_nvim_lsp').default_capabilities()
 local lspconfig = require('lspconfig')
-local servers = { 'cssls', 'eslint', 'rubocop', 'ruby_lsp', 'somesass_ls', 'ts_ls'}
+local servers = { 'cssls', 'eslint', 'pylsp', 'rubocop', 'ruby_lsp', 'somesass_ls', 'ts_ls'}
 for _, lsp in ipairs(servers) do
   lspconfig[lsp].setup {
     -- on_attach = my_custom_on_attach,
@@ -146,7 +147,11 @@ end
 -- nvim-tree
 vim.g.loaded_netrw = 1
 vim.g.loaded_netrwPlugin = 1
-require("nvim-tree").setup()
+require("nvim-tree").setup({
+  view = {
+    adaptive_size = true
+  }
+})
 
 -- nvim-treesitter
 require('nvim-treesitter.configs').setup{highlight={enable=true}}
@@ -273,15 +278,22 @@ vim.keymap.set('n', '<leader>ce', '<Cmd>edit $MYVIMRC<CR>', { desc = 'Config: ed
 vim.keymap.set('n', '<leader>cl', '<Cmd>source $MYVIMRC<CR>', { desc = 'Config: load config' })
 
 vim.keymap.set('n', '<leader>df', '<Cmd>lua vim.diagnostic.open_float()<CR>', { desc = 'Diagnostics: open float' })
+vim.keymap.set('n', '<leader>dd', '<Cmd>lua vim.diagnostic.disable()<CR>', { desc = 'Diagnostics: disable' })
+vim.keymap.set('n', '<leader>de', '<Cmd>lua vim.diagnostic.enable()<CR>', { desc = 'Diagnostics: enable' })
 vim.keymap.set('n', '<leader>dn', '<Cmd>lua vim.diagnostic.goto_next()<CR>', { desc = 'Diagnostics: go to next' })
 vim.keymap.set('n', '<leader>dp', '<Cmd>lua vim.diagnostic.goto_prev()<CR>', { desc = 'Diagnostics: go to previous' })
 vim.keymap.set('n', '<leader>dr', '<Cmd>lua vim.diagnostic.reset()<CR>', { desc = 'Diagnostics: reset' })
 
+vim.keymap.set('n', '<leader>ha', 'ggVG', { desc = 'Highlight: entire file' })
+
 vim.keymap.set('n', '<leader>kd', '<Cmd>colorscheme one_monokai<CR>', { desc = 'Colour scheme: dark' })
 vim.keymap.set('n', '<leader>kl', '<Cmd>colorscheme rose-pine-dawn<CR>', { desc = 'Colour scheme: light' })
 
+vim.keymap.set("n", "<leader>rc", 'i<%  %><Left><Left><Left>', { desc = 'Ruby: Open ERB code tag' })
+vim.keymap.set("n", "<leader>re", 'i<%=  %><Left><Left><Left>', { desc = 'Ruby: Open ERB expression tag' })
 vim.keymap.set("n", "<leader>rm", [[0/ \zs{ gncdo/ }$gncendo]], { desc = 'Ruby: convert to multi-line' })
 vim.keymap.set("n", "<leader>rs", [[? \zsdo$ciw{v/\W\zsend$Jce }]], { desc = 'Ruby: convert block to single-line' })
+vim.keymap.set("n", "<leader>rx", 'i<% end %><Esc>', { desc = 'Ruby: Add end-of-block ERB code tag' })
 
 vim.keymap.set("n", "<leader>sq", [[:cdo s///g<Left><Left><Left>]], { desc = 'Substitute: replace all in quickfix list' })
 vim.keymap.set("n", "<leader>ss", [[:%s///g<Left><Left>]], { desc = 'Substitute: replace all instances with previous search' })
