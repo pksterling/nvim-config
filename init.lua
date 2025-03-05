@@ -8,6 +8,8 @@ vim.call('plug#begin')
   Plug('f-person/git-blame.nvim')
   Plug('kdheepak/lazygit.nvim')
     -- plenary (optional)
+  Plug 'nvim-lualine/lualine.nvim'
+    -- nvim-web-devicons (optional)
   Plug('iamcco/markdown-preview.nvim', { ['do'] = 'cd app && npx --yes yarn install' })
   Plug('williamboman/mason.nvim')
     -- mason-lspconfig.nvim (optional)
@@ -21,8 +23,6 @@ vim.call('plug#begin')
   Plug('nvim-tree/nvim-tree.lua')
     -- nvim-web-devicons (optional)
   Plug('nvim-treesitter/nvim-treesitter', {['do'] = ':TSUpdate'})
-  Plug('cpea2506/one_monokai.nvim')
-  Plug('rose-pine/neovim')
   Plug('nvim-telescope/telescope.nvim', { ['tag'] = '0.1.8' })
     -- plenary
     -- ripgrep (optional)
@@ -33,6 +33,13 @@ vim.call('plug#begin')
   Plug('vim-ruby/vim-ruby')
   Plug('tpope/vim-sensible')
   Plug('tpope/vim-surround')
+
+  -- colorschemes
+  Plug('sainnhe/everforest')
+  Plug('ellisonleao/gruvbox.nvim')
+  Plug('sainnhe/gruvbox-material')
+  Plug('cpea2506/one_monokai.nvim')
+  Plug('rose-pine/neovim')
 
 --                    ----------- dependancies ----------                     --
 
@@ -52,6 +59,7 @@ vim.call('plug#begin')
     -- mason (optional)
     -- nvim-cmp
   Plug('nvim-tree/nvim-web-devicons')
+    -- lualine (optional)
     -- nvim-tree (optional)
   Plug('nvim-lua/plenary.nvim')
     -- lazygit (optional)
@@ -70,6 +78,68 @@ vim.call('plug#end')
 require('gitblame').setup {
      --Note how the `gitblame_` prefix is omitted in `setup`
     enabled = true,
+}
+
+-- lualine
+local function truncate(length)
+  return function(string)
+    if #string <= length then
+      return string
+    end
+
+    local start_length = math.floor((length - 3) / 2)
+    local end_length = math.ceil((length - 3) / 2)
+
+    return string:sub(1, start_length) .. '...' .. string:sub(-end_length, -1)
+  end
+end
+
+require('lualine').setup {
+  options = {
+    theme = 'gruvbox',
+    component_separators = '|',
+    section_separators = { left = '', right = '' },
+    always_show_tabline = false,
+  },
+  sections = {
+    lualine_a = { { 'mode', separator = { left = '' } } },
+    lualine_b = { { 'branch', fmt = truncate(32) } },
+    lualine_c = { { 'filename', path = 1 } },
+    lualine_x = { 'filetype' },
+    lualine_y = { 
+      'progress',
+      { 'searchcount', maxcount = 999 }
+    },
+    lualine_z = { { 'location', separator = { right = '' } } }
+  },
+  inactive_sections = {
+    lualine_a = { { 'filename', path = 1, separator = { left = '' } } },
+    lualine_b = {},
+    lualine_c = {},
+    lualine_x = {},
+    lualine_y = {},
+    lualine_z = { { 'location', separator = { right = '' } } }
+  },
+  tabline = {
+    lualine_a = { {
+      'tabs',
+        mode = 2 ,
+        path = 1,
+        symbols = { modified = ' ⛬ ' },
+        separator = { left = '', right = '' }
+    } },
+    lualine_z = { {
+      ' ',
+        separator = { right = '' },
+        draw_empty = true,
+        color = function()
+          return {
+            bg = require('lualine.utils.utils')
+                   .extract_highlight_colors('lualine_c_normal', 'bg')
+          }
+        end
+    } }
+  }
 }
 
 -- mason
@@ -94,7 +164,7 @@ cmp.setup({
     ['<C-f>'] = cmp.mapping.scroll_docs(4),
     ['<C-Space>'] = cmp.mapping.complete(),
     ['<C-e>'] = cmp.mapping.abort(),
-    ['<CR>'] = cmp.mapping.confirm({ select = true }), -- Accept currently selected item. Set `select` to `false` to only confirm explicitly selected items.
+    ['<CR>'] = cmp.mapping.confirm({ select = false }),
   }),
   sources = cmp.config.sources({
     { name = 'nvim_lsp' },
@@ -136,12 +206,28 @@ cmp.setup.cmdline(':', {
 -- Set up lspconfig.
 local capabilities = require('cmp_nvim_lsp').default_capabilities()
 local lspconfig = require('lspconfig')
-local servers = { 'cssls', 'eslint', 'pylsp', 'rubocop', 'ruby_lsp', 'somesass_ls', 'ts_ls'}
-for _, lsp in ipairs(servers) do
-  lspconfig[lsp].setup {
-    -- on_attach = my_custom_on_attach,
-    capabilities = capabilities,
-  }
+
+-- List of servers
+local servers = {
+  cssls = {},
+  eslint = {},
+  pylsp = {},
+  somesass_ls = {},
+  ts_ls = {},
+
+  -- Custom config for Ruby servers
+  rubocop = {
+    cmd = { "/Users/peytonsterling/.rbenv/shims/rubocop", "--lsp" }
+  },
+  ruby_lsp = {
+    cmd = { "/Users/peytonsterling/.rbenv/shims/ruby-lsp" }
+  },
+}
+
+-- Apply the configuration
+for lsp, config in pairs(servers) do
+  config.capabilities = capabilities
+  lspconfig[lsp].setup(config)
 end
 
 -- nvim-tree
@@ -176,26 +262,7 @@ require('telescope').setup{
 require('telescope').load_extension('fzf')
 
 -----------------------------------------------------------------------------}}}
--- 3. APPEARANCE ------------------------------------------------------------{{{
-
-vim.cmd('colorscheme one_monokai')
--- vim.cmd('colorscheme rose-pine-moon')
-
-vim.diagnostic.config({ float = { border = "rounded" } })
-vim.wo.number = true
-vim.wo.relativenumber = true
-vim.opt.colorcolumn = { 80, 140 }
-vim.opt.listchars = {
-  leadmultispace = "–›\\x20›",
-  trail = "¤",
-  precedes = "«",
-  extends = "»"
-}
-vim.o.list = true
-vim.o.statusline = [[ %<%f\ %h%m%r%=%-14.(%l,%c%V%)\ %P %{ObsessionStatus()}]]
-
------------------------------------------------------------------------------}}}
--- 4. FUNCTIONS -----------------------------------------------------------{{{
+-- 3. FUNCTIONS -----------------------------------------------------------{{{
 
 function centre_panel()
   vim.cmd([[
@@ -239,6 +306,33 @@ function next_terminal_buffer()
   vim.cmd("terminal")
 end
 
+local function rename_tab()
+  local new_name = vim.fn.input('New tab name: ')
+
+  if new_name and new_name ~= '' then
+    vim.cmd('LualineRenameTab ' .. new_name)
+  end
+end
+
+-----------------------------------------------------------------------------}}}
+-- 4. APPEARANCE ------------------------------------------------------------{{{
+
+vim.o.background = "dark"
+vim.cmd('colorscheme gruvbox')
+
+vim.diagnostic.config({ float = { border = "rounded" } })
+vim.wo.number = true
+vim.wo.relativenumber = true
+vim.opt.colorcolumn = { 80, 140 }
+vim.opt.listchars = {
+  leadmultispace = "–›\\x20›",
+  trail = "¤",
+  precedes = "«",
+  extends = "»"
+}
+vim.o.list = true
+vim.o.termguicolors = true
+
 -----------------------------------------------------------------------------}}}
 -- 5. START-UP ----------------------------------------------------------------{{{
 
@@ -252,6 +346,9 @@ vim.api.nvim_create_autocmd("VimEnter", {
 })
 
 vim.cmd([[ set sessionoptions+=localoptions ]])
+
+vim.g.ruby_host_prog = "~/.rbenv/shims/ruby"
+vim.env.PATH = "~/.rbenv/shims:" .. vim.env.PATH
 
 -----------------------------------------------------------------------------}}}
 -- 6. EDITOR ----------------------------------------------------------------{{{
@@ -274,6 +371,10 @@ vim.g.mapleader = ' '
 
 --                        ---------- normal ----------                        --
 
+vim.keymap.set('n', '<leader>bo', '<Cmd>tabnew<CR>', { desc = 'Tab: new' })
+vim.keymap.set('n', '<leader>br', rename_tab, { desc = 'Tab: rename' })
+vim.keymap.set('n', '<leader>bx', '<Cmd>tabclose<CR>', { desc = 'Tab: close' })
+
 vim.keymap.set('n', '<leader>ce', '<Cmd>edit $MYVIMRC<CR>', { desc = 'Config: edit config' })
 vim.keymap.set('n', '<leader>cl', '<Cmd>source $MYVIMRC<CR>', { desc = 'Config: load config' })
 
@@ -286,8 +387,8 @@ vim.keymap.set('n', '<leader>dr', '<Cmd>lua vim.diagnostic.reset()<CR>', { desc 
 
 vim.keymap.set('n', '<leader>ha', 'ggVG', { desc = 'Highlight: entire file' })
 
-vim.keymap.set('n', '<leader>kd', '<Cmd>colorscheme one_monokai<CR>', { desc = 'Colour scheme: dark' })
-vim.keymap.set('n', '<leader>kl', '<Cmd>colorscheme rose-pine-dawn<CR>', { desc = 'Colour scheme: light' })
+vim.keymap.set('n', '<leader>kd', '<Cmd>set background=dark<CR>', { desc = 'Colour scheme: dark' })
+vim.keymap.set('n', '<leader>kl', '<Cmd>set background=light<CR>', { desc = 'Colour scheme: light' })
 
 vim.keymap.set("n", "<leader>rc", 'i<%  %><Left><Left><Left>', { desc = 'Ruby: Open ERB code tag' })
 vim.keymap.set("n", "<leader>re", 'i<%=  %><Left><Left><Left>', { desc = 'Ruby: Open ERB expression tag' })
@@ -304,6 +405,7 @@ vim.keymap.set("n", "<leader>tw", '<Cmd>rightb vsp | term<CR>', { desc = 'Termin
 
 vim.keymap.set('n', '<leader>wc', centre_panel, { desc = 'Window: centre window' })
 vim.keymap.set('n', '<leader>wn', '<Cmd>rightb vsp<CR>', { desc = 'Window: new window' })
+vim.keymap.set('n', '<leader>wx', '<Cmd>q<CR>', { desc = 'Window: close window' })
 
 -- lazygit
 vim.keymap.set('n', '<leader>gg', '<Cmd>LazyGit<CR>')
@@ -323,7 +425,13 @@ vim.keymap.set('n', '<leader>fh', tsb.help_tags, { desc = 'Telescope help tags' 
 
 --                        ---------- visual ----------                        --
 
+vim.keymap.set("x", "<Tab>", ">gv", { desc = 'Indent lines' })
+vim.keymap.set("x", "<S-Tab>", "<gv", { desc = 'Outdent lines' })
+
 vim.keymap.set('v', '<leader>cc', '"*y', { desc = 'Copy to clipboard' })
+
+vim.keymap.set('v', '<leader>sa', "<Cmd>'<,'>sort<CR>", { desc = 'Sort: ascending' })
+vim.keymap.set('v', '<leader>sd', "<Cmd>'<,'>sort!<CR>", { desc = 'Sort: descending' })
 
 --                       ---------- terminal ----------                       --
 
