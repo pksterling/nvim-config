@@ -5,6 +5,8 @@ local Plug = vim.fn['plug#']
 
 vim.call('plug#begin')
 
+  Plug('Exafunction/codeium.vim', { ['branch'] = 'main' })
+  Plug('hat0uma/csvview.nvim')
   Plug('f-person/git-blame.nvim')
   Plug('kdheepak/lazygit.nvim')
     -- plenary (optional)
@@ -22,7 +24,7 @@ vim.call('plug#begin')
     -- nvim-lspconfig
   Plug('nvim-tree/nvim-tree.lua')
     -- nvim-web-devicons (optional)
-  Plug('nvim-treesitter/nvim-treesitter', {['do'] = ':TSUpdate'})
+  Plug('nvim-treesitter/nvim-treesitter', { ['do'] = ':TSUpdate' })
   Plug('nvim-telescope/telescope.nvim', { ['tag'] = '0.1.8' })
     -- plenary
     -- ripgrep (optional)
@@ -74,6 +76,16 @@ vim.call('plug#end')
 -----------------------------------------------------------------------------}}}
 -- 2. PLUG-IN SETUP ---------------------------------------------------------{{{
 
+-- codeium
+vim.g.codeium_idle_delay = 200
+
+-- csvview
+require("csvview").setup({
+    view = {
+      display_mode = "border"
+    }
+})
+
 -- git-blame
 require('gitblame').setup {
      --Note how the `gitblame_` prefix is omitted in `setup`
@@ -99,18 +111,19 @@ require('lualine').setup {
     theme = 'gruvbox',
     component_separators = '|',
     section_separators = { left = '', right = '' },
-    always_show_tabline = false,
   },
   sections = {
-    lualine_a = { { 'mode', separator = { left = '' } } },
-    lualine_b = { { 'branch', fmt = truncate(32) } },
+    lualine_a = { { 'mode', separator = { left = '', right = '' } } },
+    lualine_b = { 'filetype' },
     lualine_c = { { 'filename', path = 1 } },
-    lualine_x = { 'filetype' },
+    lualine_x = { {
+      function() return '{…}' .. vim.fn['codeium#GetStatusString']() end
+    } },
     lualine_y = { 
-      'progress',
-      { 'searchcount', maxcount = 999 }
+      { 'searchcount', maxcount = 999 },
+      'progress'
     },
-    lualine_z = { { 'location', separator = { right = '' } } }
+    lualine_z = { { 'location', separator = { left = '', right = '' } } }
   },
   inactive_sections = {
     lualine_a = { { 'filename', path = 1, separator = { left = '' } } },
@@ -126,18 +139,16 @@ require('lualine').setup {
         mode = 2 ,
         path = 1,
         symbols = { modified = ' ⛬ ' },
-        separator = { left = '', right = '' }
+        separator = { left = '', right = '' },
+        use_mode_colors = true
+    } },
+    lualine_y = { {
+      function() return vim.fn['ObsessionStatus']() == '[$]' and '⏺' or '⏸' end,
+      icon = '$',
     } },
     lualine_z = { {
-      ' ',
-        separator = { right = '' },
-        draw_empty = true,
-        color = function()
-          return {
-            bg = require('lualine.utils.utils')
-                   .extract_highlight_colors('lualine_c_normal', 'bg')
-          }
-        end
+      'branch',
+        separator = { left = '', right = '' },
     } }
   }
 }
@@ -314,10 +325,42 @@ local function rename_tab()
   end
 end
 
+function open_or_create_config_tab()
+  local config_tab_found = false
+
+  -- Loop through all tabs
+  for i = 1, vim.fn.tabpagenr('$') do
+    local first_buffer_number = vim.fn.tabpagebuflist(i)[1]
+    local first_buffer_filename = vim.fn.bufname(first_buffer_number)
+
+    if vim.fn.filereadable(first_buffer_filename) == 1 and
+        string.find(vim.fn.expand('$MYVIMRC'), first_buffer_filename) then
+      vim.cmd('tabnext ' .. i)
+      config_tab_found = true
+
+      break
+    end
+  end
+
+  if not config_tab_found then
+    vim.cmd('tabnew')  -- Create a new tab
+  end
+
+  vim.cmd('LualineRenameTab Config')
+  vim.cmd('edit $MYVIMRC')
+end
+
 -----------------------------------------------------------------------------}}}
 -- 4. APPEARANCE ------------------------------------------------------------{{{
 
-vim.o.background = "dark"
+local is_dark_mode = vim.fn.system("osascript -e 'tell application \"System Events\" to tell appearance preferences to return dark mode'") == "true\n"
+
+if is_dark_mode then
+  vim.o.background = "dark"
+else
+  vim.o.background = "light"
+end
+
 vim.cmd('colorscheme gruvbox')
 
 vim.diagnostic.config({ float = { border = "rounded" } })
@@ -332,6 +375,7 @@ vim.opt.listchars = {
 }
 vim.o.list = true
 vim.o.termguicolors = true
+vim.opt.showmode = false
 
 -----------------------------------------------------------------------------}}}
 -- 5. START-UP ----------------------------------------------------------------{{{
@@ -371,11 +415,13 @@ vim.g.mapleader = ' '
 
 --                        ---------- normal ----------                        --
 
+vim.keymap.set('n', '<leader>bn', 'gt', { desc = 'Tab: next' })
 vim.keymap.set('n', '<leader>bo', '<Cmd>tabnew<CR>', { desc = 'Tab: new' })
+vim.keymap.set('n', '<leader>bp', 'gT', { desc = 'Tab: previous' })
 vim.keymap.set('n', '<leader>br', rename_tab, { desc = 'Tab: rename' })
 vim.keymap.set('n', '<leader>bx', '<Cmd>tabclose<CR>', { desc = 'Tab: close' })
 
-vim.keymap.set('n', '<leader>ce', '<Cmd>edit $MYVIMRC<CR>', { desc = 'Config: edit config' })
+vim.keymap.set('n', '<leader>ce', open_or_create_config_tab, { desc = 'Config: edit config' })
 vim.keymap.set('n', '<leader>cl', '<Cmd>source $MYVIMRC<CR>', { desc = 'Config: load config' })
 
 vim.keymap.set('n', '<leader>df', '<Cmd>lua vim.diagnostic.open_float()<CR>', { desc = 'Diagnostics: open float' })
@@ -385,10 +431,28 @@ vim.keymap.set('n', '<leader>dn', '<Cmd>lua vim.diagnostic.goto_next()<CR>', { d
 vim.keymap.set('n', '<leader>dp', '<Cmd>lua vim.diagnostic.goto_prev()<CR>', { desc = 'Diagnostics: go to previous' })
 vim.keymap.set('n', '<leader>dr', '<Cmd>lua vim.diagnostic.reset()<CR>', { desc = 'Diagnostics: reset' })
 
+-- telescope
+local tsb = require('telescope.builtin')
+vim.keymap.set('n', '<leader>fb', function() tsb.buffers({ sort_mru=true, ignore_current_buffer=true }) end, { desc = 'Telescope buffers' })
+vim.keymap.set('n', '<leader>fc', tsb.commands, { desc = 'Telescope commands tags'})
+vim.keymap.set('n', '<leader>ff', tsb.find_files, { desc = 'Telescope find files' })
+vim.keymap.set('n', '<leader>fg', tsb.live_grep, { desc = 'Telescope live grep' })
+vim.keymap.set('n', '<leader>fh', tsb.help_tags, { desc = 'Telescope help tags' })
+
+-- nvim-tree
+vim.keymap.set('n', '<leader>ec', '<Cmd>NvimTreeCollapse<CR>')
+vim.keymap.set('n', '<leader>ef', '<Cmd>NvimTreeFindFile<CR>')
+vim.keymap.set('n', '<leader>et', '<Cmd>NvimTreeToggle<CR>')
+
+-- lazygit
+vim.keymap.set('n', '<leader>gg', '<Cmd>LazyGit<CR>')
+
 vim.keymap.set('n', '<leader>ha', 'ggVG', { desc = 'Highlight: entire file' })
 
 vim.keymap.set('n', '<leader>kd', '<Cmd>set background=dark<CR>', { desc = 'Colour scheme: dark' })
 vim.keymap.set('n', '<leader>kl', '<Cmd>set background=light<CR>', { desc = 'Colour scheme: light' })
+
+vim.keymap.set('n', '<leader>oo', '<Cmd>Obsession<CR>', { desc = 'Obsession: toggle session tracking' })
 
 vim.keymap.set("n", "<leader>rc", 'i<%  %><Left><Left><Left>', { desc = 'Ruby: Open ERB code tag' })
 vim.keymap.set("n", "<leader>re", 'i<%=  %><Left><Left><Left>', { desc = 'Ruby: Open ERB expression tag' })
@@ -404,24 +468,15 @@ vim.keymap.set("n", "<leader>tn", next_terminal_buffer, { desc = 'Terminal: swit
 vim.keymap.set("n", "<leader>tw", '<Cmd>rightb vsp | term<CR>', { desc = 'Terminal: open terminal in new window' })
 
 vim.keymap.set('n', '<leader>wc', centre_panel, { desc = 'Window: centre window' })
-vim.keymap.set('n', '<leader>wn', '<Cmd>rightb vsp<CR>', { desc = 'Window: new window' })
+vim.keymap.set('n', '<leader>wh', '<Cmd>split<CR>', { desc = 'Window: new horizontal split' })
+vim.keymap.set('n', '<leader>wn', '<Cmd>rightb vsp<CR>', { desc = 'Window: new vertical split' })
 vim.keymap.set('n', '<leader>wx', '<Cmd>q<CR>', { desc = 'Window: close window' })
 
--- lazygit
-vim.keymap.set('n', '<leader>gg', '<Cmd>LazyGit<CR>')
+--                        ---------- insert ----------                        --
 
--- nvim-tree
-vim.keymap.set('n', '<leader>ec', '<Cmd>NvimTreeCollapse<CR>')
-vim.keymap.set('n', '<leader>ef', '<Cmd>NvimTreeFindFile<CR>')
-vim.keymap.set('n', '<leader>et', '<Cmd>NvimTreeToggle<CR>')
-
--- telescope
-local tsb = require('telescope.builtin')
-vim.keymap.set('n', '<leader>fb', function() tsb.buffers({ sort_mru=true, ignore_current_buffer=true }) end, { desc = 'Telescope buffers' })
-vim.keymap.set('n', '<leader>fc', tsb.commands, { desc = 'Telescope commands tags'})
-vim.keymap.set('n', '<leader>ff', tsb.find_files, { desc = 'Telescope find files' })
-vim.keymap.set('n', '<leader>fg', tsb.live_grep, { desc = 'Telescope live grep' })
-vim.keymap.set('n', '<leader>fh', tsb.help_tags, { desc = 'Telescope help tags' })
+vim.keymap.set('i', '<c-;>', function() return vim.fn['codeium#CycleCompletions'](1) end, { expr = true, silent = true })
+vim.keymap.set('i', '<c-,>', function() return vim.fn['codeium#CycleCompletions'](-1) end, { expr = true, silent = true })
+vim.keymap.set('i', '<c-x>', function() return vim.fn['codeium#Clear']() end, { expr = true, silent = true })
 
 --                        ---------- visual ----------                        --
 
@@ -430,8 +485,10 @@ vim.keymap.set("x", "<S-Tab>", "<gv", { desc = 'Outdent lines' })
 
 vim.keymap.set('v', '<leader>cc', '"*y', { desc = 'Copy to clipboard' })
 
-vim.keymap.set('v', '<leader>sa', "<Cmd>'<,'>sort<CR>", { desc = 'Sort: ascending' })
-vim.keymap.set('v', '<leader>sd', "<Cmd>'<,'>sort!<CR>", { desc = 'Sort: descending' })
+-- vim.keymap.set('v', '<leader>sa', "[[:sort<CR>]]", { desc = 'Sort: ascending' })
+-- vim.keymap.set('v', '<leader>sd', "[[:sort!<CR>]]", { desc = 'Sort: descending' })
+
+vim.keymap.set("v", "<leader>ss", [[:s///g<Left><Left>]], { desc = 'Substitute: replace all highlighted instances with previous search' })
 
 --                       ---------- terminal ----------                       --
 
